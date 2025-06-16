@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛠️ Supabase 테이블 설정 도구</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 32px;
+        }
+        
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        
+        .section h2 {
+            margin-top: 0;
+            color: #ffd700;
+        }
+        
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            border-left: 4px solid #4caf50;
+        }
+        
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+            border-left: 4px solid #f44336;
+        }
+        
+        .warning {
+            background: rgba(255, 193, 7, 0.3);
+            border-left: 4px solid #ffc107;
+        }
+        
+        #log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .table-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .table-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .table-status {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .status-ok { color: #4caf50; }
+        .status-missing { color: #f44336; }
+        .status-unknown { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛠️ Supabase 테이블 설정 도구</h1>
+        
+        <div class="section">
+            <h2>📊 현재 테이블 상태</h2>
+            <button onclick="checkAllTables()">🔍 테이블 상태 확인</button>
+            <button onclick="createTestData()">👥 테스트 사용자 생성</button>
+            <button onclick="clearLog()">🗑️ 로그 지우기</button>
+            
+            <div class="table-list" id="table-status">
+                <div class="table-item">
+                    <div>📝 profiles</div>
+                    <div class="table-status status-unknown" id="profiles-status">확인 중...</div>
+                </div>
+                <div class="table-item">
+                    <div>💕 interactions</div>
+                    <div class="table-status status-unknown" id="interactions-status">확인 중...</div>
+                </div>
+                <div class="table-item">
+                    <div>🤝 matches</div>
+                    <div class="table-status status-unknown" id="matches-status">확인 중...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🔧 테이블 생성 (수동)</h2>
+            <p>테이블이 없는 경우, 아래 SQL을 Supabase 대시보드에서 실행하세요:</p>
+            <button onclick="showCreateSQL()">📋 SQL 스크립트 보기</button>
+            <button onclick="copyCreateSQL()">📄 클립보드에 복사</button>
+        </div>
+        
+        <div class="section">
+            <h2>📝 실시간 로그</h2>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- 설정 파일들 -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/supabase-config.js"></script>
+
+    <script>
+        let logCount = 0;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '📝';
+            
+            logCount++;
+            logDiv.textContent += `[${timestamp}] ${emoji} ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            if (logCount > 100) {
+                logDiv.textContent = `[${timestamp}] 🧹 로그 자동 정리\n`;
+                logCount = 1;
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+            logCount = 0;
+            log('로그 초기화됨');
+        }
+        
+        function updateTableStatus(tableName, status) {
+            const statusElement = document.getElementById(`${tableName}-status`);
+            if (statusElement) {
+                statusElement.textContent = status;
+                statusElement.className = `table-status ${
+                    status.includes('존재') ? 'status-ok' : 
+                    status.includes('없음') ? 'status-missing' : 
+                    'status-unknown'
+                }`;
+            }
+        }
+        
+        async function checkTable(tableName) {
+            log(`🔍 ${tableName} 테이블 확인 중...`);
+            
+            try {
+                if (!window.supabaseClient) {
+                    throw new Error('Supabase 클라이언트가 초기화되지 않음');
+                }
+                
+                const { data, error } = await window.supabaseClient
+                    .from(tableName)
+                    .select('*')
+                    .limit(1);
+                
+                if (error) {
+                    if (error.code === '42P01') {
+                        log(`❌ ${tableName} 테이블이 존재하지 않음`, 'error');
+                        updateTableStatus(tableName, '❌ 없음');
+                        return false;
+                    } else {
+                        log(`⚠️ ${tableName} 테이블 확인 중 오류: ${error.message}`, 'warning');
+                        updateTableStatus(tableName, '⚠️ 오류');
+                        return false;
+                    }
+                } else {
+                    log(`✅ ${tableName} 테이블 존재함 (${data?.length || 0}개 레코드)`, 'success');
+                    updateTableStatus(tableName, '✅ 존재');
+                    return true;
+                }
+            } catch (err) {
+                log(`❌ ${tableName} 테이블 확인 실패: ${err.message}`, 'error');
+                updateTableStatus(tableName, '❌ 실패');
+                return false;
+            }
+        }
+        
+        async function checkAllTables() {
+            log('=== 모든 테이블 상태 확인 시작 ===');
+            
+            const tables = ['profiles', 'interactions', 'matches'];
+            let allExist = true;
+            
+            for (const table of tables) {
+                const exists = await checkTable(table);
+                if (!exists) allExist = false;
+            }
+            
+            log('=== 테이블 상태 확인 완료 ===');
+            
+            if (allExist) {
+                log('🎉 모든 테이블이 존재합니다!', 'success');
+            } else {
+                log('⚠️ 일부 테이블이 누락되었습니다. SQL 스크립트를 실행하세요.', 'warning');
+            }
+        }
+        
+        async function createTestData() {
+            log('=== 테스트 데이터 생성 시작 ===');
+            
+            const testProfiles = [
+                {
+                    user_id: 'test_user_alice',
+                    nickname: 'Alice',
+                    gender: 'female',
+                    birthdate: '1998-03-15',
+                    bio: '안녕하세요! 컴퓨터과학을 공부하고 있는 Alice입니다.',
+                    photo_url: null,
+                    created_at: new Date().toISOString()
+                },
+                {
+                    user_id: 'test_user_bob',
+                    nickname: 'Bob',
+                    gender: 'male',
+                    birthdate: '1997-07-22',
+                    bio: '안녕하세요! 경영학과 Bob입니다. 음악과 영화를 좋아해요.',
+                    photo_url: null,
+                    created_at: new Date().toISOString()
+                },
+                {
+                    user_id: 'test_user_charlie',
+                    nickname: 'Charlie',
+                    gender: 'male',
+                    birthdate: '1999-11-08',
+                    bio: '디자인을 공부하는 Charlie입니다. 카페와 산책을 좋아합니다.',
+                    photo_url: null,
+                    created_at: new Date().toISOString()
+                }
+            ];
+            
+            for (const profile of testProfiles) {
+                try {
+                    log(`👤 ${profile.nickname} 프로필 생성 중...`);
+                    
+                    // 기존 프로필 확인
+                    const { data: existing } = await window.supabaseClient
+                        .from('profiles')
+                        .select('*')
+                        .eq('user_id', profile.user_id)
+                        .single();
+                    
+                    if (existing) {
+                        log(`✅ ${profile.nickname} 프로필이 이미 존재함`, 'success');
+                        continue;
+                    }
+                    
+                    // 새 프로필 생성
+                    const { data, error } = await window.supabaseClient
+                        .from('profiles')
+                        .insert([profile]);
+                    
+                    if (error) {
+                        log(`❌ ${profile.nickname} 프로필 생성 실패: ${error.message}`, 'error');
+                    } else {
+                        log(`✅ ${profile.nickname} 프로필 생성 완료`, 'success');
+                    }
+                } catch (err) {
+                    log(`❌ ${profile.nickname} 프로필 생성 중 예외: ${err.message}`, 'error');
+                }
+            }
+            
+            log('=== 테스트 데이터 생성 완료 ===');
+        }
+        
+        function showCreateSQL() {
+            const sql = `-- 매칭 앱 필수 테이블 생성 SQL
+-- Supabase 대시보드의 SQL Editor에서 실행하세요
+
+-- 1. interactions 테이블 (좋아요/패스 기록)
+CREATE TABLE IF NOT EXISTS interactions (
+    id BIGSERIAL PRIMARY KEY,
+    from_user_id TEXT NOT NULL,
+    to_user_id TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('like', 'pass')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(from_user_id, to_user_id)
+);
+
+-- 2. matches 테이블 (매칭 성공 기록)
+CREATE TABLE IF NOT EXISTS matches (
+    id BIGSERIAL PRIMARY KEY,
+    user1_id TEXT NOT NULL,
+    user2_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_message_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user1_id, user2_id),
+    CONSTRAINT different_users CHECK (user1_id != user2_id)
+);
+
+-- 3. 인덱스 생성 (성능 향상)
+CREATE INDEX IF NOT EXISTS idx_interactions_from_user ON interactions(from_user_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_to_user ON interactions(to_user_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_type ON interactions(type);
+CREATE INDEX IF NOT EXISTS idx_matches_user1 ON matches(user1_id);
+CREATE INDEX IF NOT EXISTS idx_matches_user2 ON matches(user2_id);
+
+-- 4. RLS (Row Level Security) 활성화
+ALTER TABLE interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
+
+-- 5. RLS 정책 (보안 규칙)
+CREATE POLICY "Users can insert their own interactions" ON interactions
+    FOR INSERT WITH CHECK (auth.uid()::text = from_user_id);
+
+CREATE POLICY "Users can view interactions involving them" ON interactions
+    FOR SELECT USING (auth.uid()::text = from_user_id OR auth.uid()::text = to_user_id);
+
+CREATE POLICY "Users can insert matches they're part of" ON matches
+    FOR INSERT WITH CHECK (auth.uid()::text = user1_id OR auth.uid()::text = user2_id);
+
+CREATE POLICY "Users can view their own matches" ON matches
+    FOR SELECT USING (auth.uid()::text = user1_id OR auth.uid()::text = user2_id);
+
+SELECT 'Tables created successfully!' as result;`;
+            
+            log('📋 SQL 스크립트:');
+            log(sql);
+        }
+        
+        async function copyCreateSQL() {
+            const sql = `-- 매칭 앱 필수 테이블 생성 SQL
+CREATE TABLE IF NOT EXISTS interactions (
+    id BIGSERIAL PRIMARY KEY,
+    from_user_id TEXT NOT NULL,
+    to_user_id TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('like', 'pass')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(from_user_id, to_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS matches (
+    id BIGSERIAL PRIMARY KEY,
+    user1_id TEXT NOT NULL,
+    user2_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_message_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user1_id, user2_id),
+    CONSTRAINT different_users CHECK (user1_id != user2_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_interactions_from_user ON interactions(from_user_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_to_user ON interactions(to_user_id);
+CREATE INDEX IF NOT EXISTS idx_matches_user1 ON matches(user1_id);
+CREATE INDEX IF NOT EXISTS idx_matches_user2 ON matches(user2_id);
+
+ALTER TABLE interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matches ENABLE ROW LEVEL SECURITY;`;
+            
+            try {
+                await navigator.clipboard.writeText(sql);
+                log('✅ SQL 스크립트가 클립보드에 복사되었습니다!', 'success');
+                log('Supabase 대시보드 > SQL Editor에서 붙여넣기하여 실행하세요.', 'success');
+            } catch (err) {
+                log('❌ 클립보드 복사 실패. 수동으로 복사하세요.', 'error');
+                showCreateSQL();
+            }
+        }
+        
+        // 페이지 로드 시 자동 확인
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Supabase 테이블 설정 도구 로드 완료');
+            
+            setTimeout(() => {
+                log('Firebase 상태: ' + (typeof firebase !== 'undefined' ? '✅' : '❌'));
+                log('Supabase 상태: ' + (typeof window.supabase !== 'undefined' ? '✅' : '❌'));
+                log('Supabase Client 상태: ' + (typeof window.supabaseClient !== 'undefined' ? '✅' : '❌'));
+                
+                if (typeof window.supabaseClient !== 'undefined') {
+                    setTimeout(() => {
+                        checkAllTables();
+                    }, 1000);
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

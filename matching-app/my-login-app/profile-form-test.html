@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로필 폼 테스트</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background-color: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .debug { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin-top: 20px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>프로필 폼 제출 테스트</h1>
+    <p>이 페이지는 폼 제출이 올바르게 작동하는지 테스트하기 위한 것입니다.</p>
+    
+    <form id="test-form" onsubmit="return false;">
+        <div class="form-group">
+            <label for="nickname">닉네임</label>
+            <input type="text" id="nickname" name="nickname" required value="테스트유저">
+        </div>
+        <div class="form-group">
+            <label for="gender">성별</label>
+            <select id="gender" name="gender" required>
+                <option value="">선택하세요...</option>
+                <option value="male">남성</option>
+                <option value="female" selected>여성</option>
+                <option value="other">기타</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="birthdate">생년월일</label>
+            <input type="date" id="birthdate" name="birthdate" required value="1995-01-01">
+        </div>
+        <div class="form-group">
+            <label for="bio">자기소개</label>
+            <textarea id="bio" name="bio" rows="3">안녕하세요! 테스트 중입니다.</textarea>
+        </div>
+        <button type="button" id="save-btn" onclick="handleFormSubmit(event)">프로필 저장 (테스트)</button>
+    </form>
+
+    <div class="debug">
+        <h3>🔧 디버깅 로그</h3>
+        <div id="debug-log"></div>
+        <button type="button" onclick="clearLog()">로그 지우기</button>
+    </div>
+
+    <script>
+        // 로그 함수
+        function log(message, type = 'info') {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+            debugLog.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '';
+        }
+
+        // 폼 제출 핸들러
+        async function handleFormSubmit(event) {
+            log("=== 폼 제출 시작 ===");
+            log(`이벤트 타입: ${event ? event.type : 'undefined'}`);
+            log(`이벤트 대상: ${event ? event.target.tagName : 'undefined'}`);
+            
+            // 기본 동작 방지
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                log("preventDefault() 및 stopPropagation() 호출됨");
+            }
+
+            const button = document.getElementById('save-btn');
+            const originalText = button.textContent;
+
+            try {
+                // 버튼 상태 변경
+                button.disabled = true;
+                button.textContent = '처리 중...';
+                button.style.backgroundColor = '#ffc107';
+                log("버튼 상태 변경됨", 'info');
+
+                // 폼 데이터 수집
+                const formData = {
+                    nickname: document.getElementById('nickname').value.trim(),
+                    gender: document.getElementById('gender').value,
+                    birthdate: document.getElementById('birthdate').value,
+                    bio: document.getElementById('bio').value.trim()
+                };
+
+                log(`수집된 데이터: ${JSON.stringify(formData)}`, 'info');
+
+                // 유효성 검사
+                if (!formData.nickname || !formData.gender || !formData.birthdate) {
+                    throw new Error('필수 필드가 비어있습니다');
+                }
+
+                log("유효성 검사 통과", 'success');
+
+                // 가짜 저장 프로세스 (2초 대기)
+                log("저장 프로세스 시작...");
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // 성공 처리
+                button.textContent = '저장 완료!';
+                button.style.backgroundColor = '#28a745';
+                log("저장 완료!", 'success');
+
+                // 2초 후 매칭 페이지로 이동한다고 가정
+                setTimeout(() => {
+                    log("매칭 페이지로 이동 예정 (실제로는 이동하지 않음)", 'success');
+                    
+                    // 버튼 복원
+                    button.disabled = false;
+                    button.textContent = originalText;
+                    button.style.backgroundColor = '';
+                }, 2000);
+
+                return true;
+
+            } catch (error) {
+                log(`오류 발생: ${error.message}`, 'error');
+                
+                // 버튼 복원
+                button.disabled = false;
+                button.textContent = originalText;
+                button.style.backgroundColor = '';
+                
+                return false;
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            log("페이지 로드 완료");
+            
+            // 폼 제출 방지 설정
+            const form = document.getElementById('test-form');
+            
+            form.onsubmit = function(event) {
+                log("폼 onsubmit 호출됨 - 기본 동작 방지");
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            };
+
+            form.addEventListener('submit', function(event) {
+                log("폼 addEventListener submit 호출됨 - 기본 동작 방지");
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            });
+
+            log("이벤트 리스너 설정 완료", 'success');
+        });
+    </script>
+</body>
+</html>

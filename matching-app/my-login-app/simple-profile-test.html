@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>간단한 프로필 테스트</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background-color: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .log { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin-top: 20px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>간단한 프로필 저장 테스트</h1>
+    
+    <form id="simple-form" onsubmit="return false;">
+        <div class="form-group">
+            <label for="nickname">닉네임</label>
+            <input type="text" id="nickname" name="nickname" required value="테스트유저">
+        </div>
+        <div class="form-group">
+            <label for="gender">성별</label>
+            <select id="gender" name="gender" required>
+                <option value="">선택하세요...</option>
+                <option value="male">남성</option>
+                <option value="female" selected>여성</option>
+                <option value="other">기타</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="birthdate">생년월일</label>
+            <input type="date" id="birthdate" name="birthdate" required value="1995-01-01">
+        </div>
+        <div class="form-group">
+            <label for="bio">자기소개</label>
+            <textarea id="bio" name="bio" rows="3">안녕하세요! 테스트 중입니다.</textarea>
+        </div>
+        
+        <button type="button" onclick="saveProfile()">프로필 저장</button>
+        <button type="button" onclick="testSupabase()">Supabase 테스트</button>
+        <button type="button" onclick="clearLog()">로그 지우기</button>
+    </form>
+
+    <div class="log" id="log"></div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // 로그 함수
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+            logElement.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Supabase 설정
+        const SUPABASE_URL = 'https://wamndgvguaybvgoudpxm.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbW5kZ3ZndWF5YnZnb3VkcHhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2NDEwOTYsImV4cCI6MjA2NTIxNzA5Nn0.MmHWayjKCZbA_f9p4A5cToUnNbhslpavmfoanH5mlZU';
+        let supabaseClient = null;
+
+        // Firebase 설정
+        const firebaseConfig = {
+            apiKey: "AIzaSyBLVL9_PZeaJzJw9F8E8QGl6Z4KX_mHVm4",
+            authDomain: "petra-79fa8.firebaseapp.com",
+            projectId: "petra-79fa8",
+            storageBucket: "petra-79fa8.firebasestorage.app",
+            messagingSenderId: "745556637175",
+            appId: "1:745556637175:web:5a99f7e5f22b4b6d2d8b7a"
+        };
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', async () => {
+            log("페이지 로드 완료");
+
+            try {
+                // Firebase 초기화
+                if (typeof firebase !== 'undefined') {
+                    firebase.initializeApp(firebaseConfig);
+                    log("✅ Firebase 초기화 완료", 'success');
+                } else {
+                    log("❌ Firebase SDK 로드 실패", 'error');
+                }
+
+                // Supabase 초기화
+                if (typeof window.supabase !== 'undefined') {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    log("✅ Supabase 클라이언트 초기화 완료", 'success');
+                } else {
+                    log("❌ Supabase SDK 로드 실패", 'error');
+                }
+
+            } catch (error) {
+                log(`초기화 오류: ${error.message}`, 'error');
+            }
+        });
+
+        // Supabase 테스트
+        async function testSupabase() {
+            log("=== Supabase 연결 테스트 시작 ===");
+
+            if (!supabaseClient) {
+                log("❌ Supabase 클라이언트가 없습니다", 'error');
+                return;
+            }
+
+            try {
+                // 테이블 존재 확인
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('id')
+                    .limit(1);
+
+                if (error) {
+                    if (error.code === '42P01') {
+                        log("⚠️ profiles 테이블이 존재하지 않습니다", 'error');
+                    } else {
+                        log(`❌ 테이블 접근 오류: ${error.message}`, 'error');
+                    }
+                } else {
+                    log("✅ profiles 테이블 접근 성공", 'success');
+                }
+
+            } catch (error) {
+                log(`❌ Supabase 테스트 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // 프로필 저장
+        async function saveProfile() {
+            log("=== 프로필 저장 시작 ===");
+
+            if (!supabaseClient) {
+                log("❌ Supabase 클라이언트가 없습니다", 'error');
+                return;
+            }
+
+            try {
+                // 폼 데이터 수집
+                const formData = {
+                    nickname: document.getElementById('nickname').value.trim(),
+                    gender: document.getElementById('gender').value,
+                    birthdate: document.getElementById('birthdate').value,
+                    bio: document.getElementById('bio').value.trim()
+                };
+
+                log(`수집된 데이터: ${JSON.stringify(formData)}`);
+
+                // 유효성 검사
+                if (!formData.nickname || !formData.gender || !formData.birthdate) {
+                    log("❌ 필수 필드가 비어있습니다", 'error');
+                    return;
+                }
+
+                // 테스트 사용자 ID (실제로는 Firebase Auth에서 가져옴)
+                const testUserId = 'test_user_' + Date.now();
+
+                // 프로필 데이터 준비
+                const profileData = {
+                    user_id: testUserId,
+                    email: 'test@example.com',
+                    nickname: formData.nickname,
+                    gender: formData.gender,
+                    birthdate: formData.birthdate,
+                    bio: formData.bio,
+                    profile_picture_url: '',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                log(`저장할 데이터: ${JSON.stringify(profileData)}`);
+
+                // Supabase에 저장
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .upsert(profileData, { onConflict: 'user_id' })
+                    .select();
+
+                if (error) {
+                    log(`❌ 저장 실패: ${error.message}`, 'error');
+                    
+                    if (error.code === '42P01') {
+                        log("💡 profiles 테이블을 먼저 생성해야 합니다", 'error');
+                    }
+                } else {
+                    log(`✅ 저장 성공: ${JSON.stringify(data)}`, 'success');
+                }
+
+            } catch (error) {
+                log(`❌ 예상치 못한 오류: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

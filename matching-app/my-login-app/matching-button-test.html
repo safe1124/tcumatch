@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 매칭 버튼 실시간 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .button-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .test-button {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            color: white;
+            font-weight: bold;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .test-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .test-button:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-pass {
+            background: #ff4458;
+        }
+        
+        .btn-like {
+            background: #42c767;
+        }
+        
+        #status {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .status-header {
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        
+        .clear-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        
+        .clear-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 매칭 버튼 실시간 테스트</h1>
+        
+        <div class="info-box">
+            <strong>📋 테스트 목적:</strong><br>
+            매칭 페이지의 ❤️ 좋아요와 ❌ 패스 버튼이 정상적으로 작동하는지 확인합니다.
+        </div>
+        
+        <div class="button-section">
+            <button class="test-button btn-pass" onclick="testPassFunction()">❌ 패스 테스트</button>
+            <button class="test-button btn-like" onclick="testLikeFunction()">❤️ 좋아요 테스트</button>
+        </div>
+        
+        <div>
+            <button class="clear-btn" onclick="clearStatus()">🗑️ 로그 지우기</button>
+            <button class="clear-btn" onclick="checkGlobalFunctions()">🔍 함수 상태 확인</button>
+            <button class="clear-btn" onclick="testSupabaseConnection()">🔗 Supabase 연결 테스트</button>
+        </div>
+        
+        <div class="status-header">📊 실시간 상태 로그:</div>
+        <div id="status"></div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- 설정 파일들 -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/matching.js"></script>
+
+    <script>
+        let logCount = 0;
+        
+        function log(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '📝';
+            
+            logCount++;
+            statusDiv.textContent += `[${timestamp}] ${emoji} ${message}\n`;
+            statusDiv.scrollTop = statusDiv.scrollHeight;
+            
+            // 로그가 너무 많아지면 초기화
+            if (logCount > 50) {
+                statusDiv.textContent = `[${timestamp}] 🧹 로그 자동 정리 (50개 이상)\n`;
+                logCount = 1;
+            }
+        }
+        
+        function clearStatus() {
+            document.getElementById('status').textContent = '';
+            logCount = 0;
+            log('로그 초기화됨');
+        }
+        
+        function testPassFunction() {
+            log('🔘 패스 버튼 클릭됨');
+            
+            try {
+                if (typeof window.passUser === 'function') {
+                    log('함수 발견: window.passUser', 'success');
+                    
+                    // 함수 실행 시도
+                    const result = window.passUser();
+                    log('passUser() 함수 호출 완료', 'success');
+                    
+                    if (result instanceof Promise) {
+                        log('비동기 함수 실행 중...', 'warning');
+                        result
+                            .then(() => log('비동기 passUser 완료', 'success'))
+                            .catch(err => log(`비동기 passUser 오류: ${err.message}`, 'error'));
+                    }
+                } else {
+                    log('window.passUser 함수를 찾을 수 없음', 'error');
+                    log(`typeof window.passUser: ${typeof window.passUser}`, 'warning');
+                }
+            } catch (error) {
+                log(`패스 함수 실행 중 오류: ${error.message}`, 'error');
+                log(`오류 스택: ${error.stack}`, 'error');
+            }
+        }
+        
+        function testLikeFunction() {
+            log('🔘 좋아요 버튼 클릭됨');
+            
+            try {
+                if (typeof window.likeUser === 'function') {
+                    log('함수 발견: window.likeUser', 'success');
+                    
+                    // 함수 실행 시도
+                    const result = window.likeUser();
+                    log('likeUser() 함수 호출 완료', 'success');
+                    
+                    if (result instanceof Promise) {
+                        log('비동기 함수 실행 중...', 'warning');
+                        result
+                            .then(() => log('비동기 likeUser 완료', 'success'))
+                            .catch(err => log(`비동기 likeUser 오류: ${err.message}`, 'error'));
+                    }
+                } else {
+                    log('window.likeUser 함수를 찾을 수 없음', 'error');
+                    log(`typeof window.likeUser: ${typeof window.likeUser}`, 'warning');
+                }
+            } catch (error) {
+                log(`좋아요 함수 실행 중 오류: ${error.message}`, 'error');
+                log(`오류 스택: ${error.stack}`, 'error');
+            }
+        }
+        
+        function checkGlobalFunctions() {
+            log('=== 전역 함수 상태 확인 ===');
+            
+            const functionsToCheck = ['likeUser', 'passUser', 'goToProfile', 'goToChats'];
+            
+            functionsToCheck.forEach(funcName => {
+                const exists = typeof window[funcName] === 'function';
+                log(`${funcName}: ${exists ? '✅ 존재' : '❌ 없음'}`, exists ? 'success' : 'error');
+            });
+            
+            // 추가 체크
+            log(`currentUser: ${typeof currentUser !== 'undefined' ? '✅ 정의됨' : '❌ 정의 안됨'}`);
+            log(`allUsers 배열: ${typeof allUsers !== 'undefined' ? `✅ ${allUsers?.length || 0}개` : '❌ 정의 안됨'}`);
+            log(`currentUserIndex: ${typeof currentUserIndex !== 'undefined' ? `✅ ${currentUserIndex}` : '❌ 정의 안됨'}`);
+        }
+        
+        function testSupabaseConnection() {
+            log('=== Supabase 연결 테스트 ===');
+            
+            if (typeof window.supabaseClient === 'undefined') {
+                log('window.supabaseClient가 정의되지 않음', 'error');
+                return;
+            }
+            
+            log('Supabase 클라이언트 발견됨', 'success');
+            
+            // 간단한 연결 테스트
+            window.supabaseClient
+                .from('profiles')
+                .select('count')
+                .then(result => {
+                    if (result.error) {
+                        log(`Supabase 연결 오류: ${result.error.message}`, 'error');
+                    } else {
+                        log('Supabase 연결 성공!', 'success');
+                    }
+                })
+                .catch(err => {
+                    log(`Supabase 테스트 예외: ${err.message}`, 'error');
+                });
+        }
+        
+        // 페이지 로드 시 초기 체크
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 테스트 페이지 로드 완료');
+            
+            // 라이브러리 체크
+            setTimeout(() => {
+                log('=== 라이브러리 로드 상태 ===');
+                log(`Firebase: ${typeof firebase !== 'undefined' ? '✅' : '❌'}`);
+                log(`Supabase: ${typeof window.supabase !== 'undefined' ? '✅' : '❌'}`);
+                log(`Supabase Client: ${typeof window.supabaseClient !== 'undefined' ? '✅' : '❌'}`);
+                
+                // 자동으로 함수 상태 확인
+                setTimeout(() => {
+                    checkGlobalFunctions();
+                }, 500);
+            }, 1000);
+        });
+        
+        // 전역 오류 캐처
+        window.addEventListener('error', (event) => {
+            log(`전역 오류 발생: ${event.error?.message || event.message}`, 'error');
+        });
+        
+        // Promise 거부 캐처
+        window.addEventListener('unhandledrejection', (event) => {
+            log(`Promise 거부: ${event.reason?.message || event.reason}`, 'error');
+        });
+    </script>
+</body>
+</html>

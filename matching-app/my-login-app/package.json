@@ -1,0 +1,24 @@
+{
+  "name": "my-login-app",
+  "version": "1.0.0",
+  "description": "This project is a simple web application that allows users to log in and register for an account. It consists of three main pages: the main entry point, a login page, and a registration page.",
+  "main": "setup-supabase-tables.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/safe1124/tculove.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/safe1124/tculove/issues"
+  },
+  "homepage": "https://github.com/safe1124/tculove#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "dotenv": "^16.5.0"
+  }
+}

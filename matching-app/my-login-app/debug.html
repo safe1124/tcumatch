@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 프로필 저장 디버그</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        .info { color: blue; }
+        button {
+            margin: 10px 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-primary { background: #007bff; color: white; border: none; }
+        .btn-success { background: #28a745; color: white; border: none; }
+        .btn-danger { background: #dc3545; color: white; border: none; }
+        #log {
+            background: #f8f9fa;
+            padding: 15px;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .checklist {
+            background: #f0f8ff;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+        }
+        .checklist li {
+            margin: 10px 0;
+        }
+        .form-test {
+            background: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ccc;
+        }
+        .form-test input, .form-test select, .form-test textarea {
+            margin: 5px 0;
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Firebase 프로필 저장 디버그 도구</h1>
+    
+    <div class="section checklist">
+        <h3>📋 Firebase Console 확인 체크리스트</h3>
+        <ol>
+            <li><strong>Authentication 설정</strong>:
+                <ul>
+                    <li>Google 로그인 제공업체가 활성화되어 있는가?</li>
+                    <li>승인된 도메인에 <code>localhost</code>, <code>127.0.0.1</code>이 추가되어 있는가?</li>
+                </ul>
+            </li>
+            <li><strong>Firestore Database 설정</strong>:
+                <ul>
+                    <li>데이터베이스가 생성되어 있는가?</li>
+                    <li>보안 규칙이 너무 제한적이지 않은가?</li>
+                    <li>테스트용 임시 규칙: <code>allow read, write: if request.auth != null;</code></li>
+                </ul>
+            </li>
+            <li><strong>Storage 설정</strong>:
+                <ul>
+                    <li>Storage 버킷이 생성되어 있는가?</li>
+                    <li>Storage 보안 규칙이 설정되어 있는가?</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h3>🔐 인증 상태</h3>
+        <div id="auth-status">확인 중...</div>
+        <button class="btn-primary" onclick="testLogin()">Google 로그인 테스트</button>
+        <button class="btn-danger" onclick="testLogout()">로그아웃</button>
+    </div>
+    
+    <div class="section">
+        <h3>🔗 Firebase 연결 테스트</h3>
+        <div id="connection-status">테스트 대기 중</div>
+        <button class="btn-primary" onclick="testFirebaseConnection()">연결 테스트</button>
+        <button class="btn-primary" onclick="testFirestorePermissions()">Firestore 권한 테스트</button>
+        <button class="btn-primary" onclick="testStoragePermissions()">Storage 권한 테스트</button>
+    </div>
+    
+    <div class="section form-test">
+        <h3>📝 프로필 저장 테스트</h3>
+        <form id="debug-profile-form">
+            <label>닉네임:</label>
+            <input type="text" id="debug-nickname" value="테스트유저" required>
+            
+            <label>성별:</label>
+            <select id="debug-gender" required>
+                <option value="">선택하세요...</option>
+                <option value="male">남성</option>
+                <option value="female">여성</option>
+                <option value="other">기타</option>
+            </select>
+            
+            <label>생년월일:</label>
+            <input type="date" id="debug-birthdate" value="1995-01-01" required>
+            
+            <label>자기소개:</label>
+            <textarea id="debug-bio" rows="3">테스트용 자기소개입니다.</textarea>
+            
+            <label>프로필 사진 (선택사항):</label>
+            <input type="file" id="debug-profile-pic" accept="image/*">
+            
+            <br><br>
+            <button type="button" class="btn-success" onclick="testProfileSave()">프로필 저장 테스트</button>
+        </form>
+        <div id="profile-save-status">테스트 대기 중</div>
+    </div>
+    
+    <div class="section">
+        <h3>📊 실시간 로그</h3>
+        <button class="btn-primary" onclick="clearLog()">로그 지우기</button>
+        <div id="log"></div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
+
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        let auth, db, storage, provider;
+        let currentUser = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : type === 'info' ? 'info' : '';
+            logDiv.innerHTML += `[${timestamp}] <span class="${className}">${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            log('디버그 도구 시작');
+            initializeFirebase();
+        });
+        
+        function initializeFirebase() {
+            try {
+                auth = firebase.auth();
+                db = firebase.firestore();
+                storage = firebase.storage();
+                provider = new firebase.auth.GoogleAuthProvider();
+                
+                log('Firebase 서비스 초기화 완료', 'success');
+                
+                auth.onAuthStateChanged((user) => {
+                    const authStatusDiv = document.getElementById('auth-status');
+                    if (user) {
+                        currentUser = user;
+                        authStatusDiv.innerHTML = `<span class="success">✅ 로그인됨: ${user.email}</span>`;
+                        log(`사용자 로그인: ${user.email}`, 'success');
+                    } else {
+                        currentUser = null;
+                        authStatusDiv.innerHTML = '<span class="warning">⚠️ 로그아웃됨</span>';
+                        log('사용자 로그아웃', 'warning');
+                    }
+                });
+                
+            } catch (error) {
+                log(`Firebase 초기화 오류: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testLogin() {
+            log('Google 로그인 테스트 시작');
+            try {
+                const result = await auth.signInWithPopup(provider);
+                log(`로그인 성공: ${result.user.email}`, 'success');
+            } catch (error) {
+                log(`로그인 오류: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testLogout() {
+            log('로그아웃 테스트');
+            try {
+                await auth.signOut();
+                log('로그아웃 성공', 'success');
+            } catch (error) {
+                log(`로그아웃 오류: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testFirebaseConnection() {
+            log('=== Firebase 연결 테스트 시작 ===');
+            const statusDiv = document.getElementById('connection-status');
+            
+            try {
+                // Firestore 기본 연결 테스트
+                log('Firestore 연결 테스트...');
+                const testCollection = await db.collection('test').limit(1).get();
+                log('Firestore 연결 성공', 'success');
+                
+                statusDiv.innerHTML = '<span class="success">✅ Firebase 연결 성공</span>';
+                
+            } catch (error) {
+                log(`Firebase 연결 오류: ${error.message}`, 'error');
+                statusDiv.innerHTML = `<span class="error">❌ 연결 오류: ${error.message}</span>`;
+            }
+        }
+        
+        async function testFirestorePermissions() {
+            if (!currentUser) {
+                log('로그인이 필요합니다', 'warning');
+                return;
+            }
+            
+            log('=== Firestore 권한 테스트 시작 ===');
+            
+            try {
+                // 읽기 권한 테스트
+                log('Firestore 읽기 권한 테스트...');
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                log('Firestore 읽기 권한 OK', 'success');
+                
+                // 쓰기 권한 테스트
+                log('Firestore 쓰기 권한 테스트...');
+                await db.collection('users').doc(currentUser.uid).set({
+                    test: 'permission_test',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                log('Firestore 쓰기 권한 OK', 'success');
+                
+            } catch (error) {
+                log(`Firestore 권한 오류: ${error.code} - ${error.message}`, 'error');
+                if (error.code === 'permission-denied') {
+                    log('보안 규칙을 확인하세요: https://console.firebase.google.com', 'error');
+                }
+            }
+        }
+        
+        async function testStoragePermissions() {
+            if (!currentUser) {
+                log('로그인이 필요합니다', 'warning');
+                return;
+            }
+            
+            log('=== Storage 권한 테스트 시작 ===');
+            
+            try {
+                // 간단한 텍스트 파일로 업로드 테스트
+                const testBlob = new Blob(['test content'], { type: 'text/plain' });
+                const testPath = `test/${currentUser.uid}/test.txt`;
+                
+                log('Storage 업로드 권한 테스트...');
+                const storageRef = storage.ref(testPath);
+                const uploadTask = await storageRef.put(testBlob);
+                
+                log('Storage 업로드 권한 OK', 'success');
+                
+                // 다운로드 URL 테스트
+                log('Storage 다운로드 URL 테스트...');
+                const downloadURL = await uploadTask.ref.getDownloadURL();
+                log(`Storage 다운로드 URL OK: ${downloadURL}`, 'success');
+                
+            } catch (error) {
+                log(`Storage 권한 오류: ${error.code} - ${error.message}`, 'error');
+            }
+        }
+        
+        async function testProfileSave() {
+            if (!currentUser) {
+                log('로그인이 필요합니다', 'warning');
+                return;
+            }
+            
+            log('=== 프로필 저장 테스트 시작 ===');
+            const statusDiv = document.getElementById('profile-save-status');
+            statusDiv.innerHTML = '<span class="info">프로필 저장 중...</span>';
+            
+            try {
+                const nickname = document.getElementById('debug-nickname').value;
+                const gender = document.getElementById('debug-gender').value;
+                const birthdate = document.getElementById('debug-birthdate').value;
+                const bio = document.getElementById('debug-bio').value;
+                const profilePicFile = document.getElementById('debug-profile-pic').files[0];
+                
+                log(`폼 데이터: 닉네임=${nickname}, 성별=${gender}, 생년월일=${birthdate}`);
+                
+                // 프로필 사진 업로드 (있다면)
+                let profilePictureURL = '';
+                if (profilePicFile) {
+                    log('프로필 사진 업로드 중...');
+                    const filePath = `profile_pictures/${currentUser.uid}/${Date.now()}_${profilePicFile.name}`;
+                    const storageRef = storage.ref(filePath);
+                    const uploadTask = await storageRef.put(profilePicFile);
+                    profilePictureURL = await uploadTask.ref.getDownloadURL();
+                    log(`프로필 사진 업로드 완료: ${profilePictureURL}`, 'success');
+                }
+                
+                // Firestore에 저장
+                log('Firestore에 프로필 데이터 저장 중...');
+                const userProfile = {
+                    uid: currentUser.uid,
+                    email: currentUser.email,
+                    nickname: nickname,
+                    gender: gender,
+                    birthdate: birthdate,
+                    bio: bio,
+                    profilePictureURL: profilePictureURL,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('users').doc(currentUser.uid).set(userProfile, { merge: true });
+                
+                log('프로필 저장 완료!', 'success');
+                statusDiv.innerHTML = '<span class="success">✅ 프로필 저장 성공!</span>';
+                
+                // 저장된 데이터 확인
+                log('저장된 데이터 확인 중...');
+                const savedDoc = await db.collection('users').doc(currentUser.uid).get();
+                if (savedDoc.exists) {
+                    log('저장된 데이터: ' + JSON.stringify(savedDoc.data(), null, 2), 'info');
+                }
+                
+            } catch (error) {
+                log(`프로필 저장 오류: ${error.message}`, 'error');
+                log(`오류 스택: ${error.stack}`, 'error');
+                statusDiv.innerHTML = `<span class="error">❌ 저장 실패: ${error.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>

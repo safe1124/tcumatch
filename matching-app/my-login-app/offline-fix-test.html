@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 오프라인 문제 해결 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        #log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Firebase 오프라인 문제 해결</h1>
+    
+    <div id="network-status" class="status info">
+        <h3>📡 네트워크 상태</h3>
+        <p id="network-info">확인 중...</p>
+    </div>
+    
+    <div id="firebase-status" class="status warning">
+        <h3>🔥 Firebase 상태</h3>
+        <p id="firebase-info">확인 중...</p>
+        <button onclick="initializeFirebase()">Firebase 초기화</button>
+        <button onclick="testOfflineRecovery()">오프라인 복구 테스트</button>
+    </div>
+    
+    <div id="auth-status" class="status warning">
+        <h3>🔐 인증 상태</h3>
+        <p id="auth-info">확인 중...</p>
+        <button onclick="testLogin()">Google 로그인 테스트</button>
+        <button onclick="logout()">로그아웃</button>
+    </div>
+    
+    <div id="firestore-status" class="status warning">
+        <h3>📊 Firestore 상태</h3>
+        <p id="firestore-info">테스트 필요</p>
+        <button onclick="testFirestoreConnection()">연결 테스트</button>
+        <button onclick="testSaveProfile()">프로필 저장 테스트</button>
+    </div>
+    
+    <div class="status">
+        <h3>📝 실시간 로그</h3>
+        <button onclick="clearLog()">로그 지우기</button>
+        <div id="log"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-storage.js"></script>
+    
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        let auth, db, storage;
+        let currentUser = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log');
+            const typePrefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${typePrefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function updateStatus(section, className, message) {
+            const element = document.getElementById(`${section}-status`);
+            const info = document.getElementById(`${section}-info`);
+            
+            element.className = `status ${className}`;
+            info.textContent = message;
+        }
+
+        // 네트워크 상태 모니터링
+        function checkNetworkStatus() {
+            const isOnline = navigator.onLine;
+            const message = isOnline ? '🟢 온라인 (정상)' : '🔴 오프라인 (연결 없음)';
+            const className = isOnline ? 'success' : 'error';
+            
+            updateStatus('network', className, message);
+            log(`네트워크 상태: ${isOnline ? '온라인' : '오프라인'}`, isOnline ? 'success' : 'error');
+            
+            return isOnline;
+        }
+
+        // Firebase 초기화
+        async function initializeFirebase() {
+            log('Firebase 초기화 시작...');
+            
+            try {
+                if (!checkNetworkStatus()) {
+                    throw new Error('네트워크 연결이 없습니다.');
+                }
+                
+                auth = firebase.auth();
+                db = firebase.firestore();
+                storage = firebase.storage();
+                
+                // Firestore 오프라인 지속성 비활성화
+                try {
+                    await db.disableNetwork();
+                    await db.enableNetwork();
+                    log('Firestore 네트워크 재설정 완료', 'success');
+                } catch (networkError) {
+                    log(`Firestore 네트워크 재설정 실패: ${networkError.message}`, 'warning');
+                }
+                
+                updateStatus('firebase', 'success', '✅ 초기화 완료');
+                log('Firebase 초기화 성공', 'success');
+                
+                // 인증 상태 리스너 설정
+                auth.onAuthStateChanged(user => {
+                    currentUser = user;
+                    if (user) {
+                        updateStatus('auth', 'success', `✅ 로그인됨: ${user.email}`);
+                        log(`사용자 로그인: ${user.email}`, 'success');
+                    } else {
+                        updateStatus('auth', 'warning', '⚠️ 로그인 필요');
+                        log('사용자 로그아웃', 'info');
+                    }
+                });
+                
+                return true;
+                
+            } catch (error) {
+                updateStatus('firebase', 'error', `❌ 초기화 실패: ${error.message}`);
+                log(`Firebase 초기화 실패: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // 오프라인 복구 테스트
+        async function testOfflineRecovery() {
+            log('오프라인 복구 테스트 시작...');
+            
+            try {
+                if (!db) {
+                    throw new Error('Firestore가 초기화되지 않았습니다.');
+                }
+                
+                // 강제로 오프라인 상태로 만들고 다시 온라인으로
+                log('1. Firestore 네트워크 비활성화...', 'info');
+                await db.disableNetwork();
+                
+                log('2. 3초 대기...', 'info');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                log('3. Firestore 네트워크 재활성화...', 'info');
+                await db.enableNetwork();
+                
+                log('4. 연결 테스트...', 'info');
+                await db.collection('test').doc('recovery-test').get();
+                
+                updateStatus('firebase', 'success', '✅ 오프라인 복구 성공');
+                log('오프라인 복구 테스트 성공', 'success');
+                
+            } catch (error) {
+                updateStatus('firebase', 'error', `❌ 복구 실패: ${error.message}`);
+                log(`오프라인 복구 테스트 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // Google 로그인 테스트
+        async function testLogin() {
+            log('Google 로그인 테스트 시작...');
+            
+            try {
+                if (!auth) {
+                    throw new Error('Firebase Auth가 초기화되지 않았습니다.');
+                }
+                
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.addScope('email');
+                provider.addScope('profile');
+                
+                const result = await auth.signInWithPopup(provider);
+                log(`Google 로그인 성공: ${result.user.email}`, 'success');
+                
+            } catch (error) {
+                log(`Google 로그인 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // 로그아웃
+        async function logout() {
+            try {
+                await auth.signOut();
+                log('로그아웃 완료', 'success');
+            } catch (error) {
+                log(`로그아웃 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // Firestore 연결 테스트
+        async function testFirestoreConnection() {
+            log('Firestore 연결 테스트 시작...');
+            
+            try {
+                if (!db) {
+                    throw new Error('Firestore가 초기화되지 않았습니다.');
+                }
+                
+                if (!currentUser) {
+                    throw new Error('로그인이 필요합니다.');
+                }
+                
+                // 간단한 읽기 테스트
+                const testDoc = await db.collection('users').doc('test').get();
+                log('Firestore 읽기 테스트 완료', 'success');
+                
+                // 쓰기 테스트
+                const testData = {
+                    testField: 'connection test',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('test').doc('connection-test').set(testData);
+                log('Firestore 쓰기 테스트 완료', 'success');
+                
+                updateStatus('firestore', 'success', '✅ 연결 및 읽기/쓰기 정상');
+                
+            } catch (error) {
+                updateStatus('firestore', 'error', `❌ 연결 실패: ${error.message}`);
+                log(`Firestore 연결 테스트 실패: ${error.message}`, 'error');
+                
+                // 오프라인 오류인 경우 복구 시도
+                if (error.message && error.message.includes('offline')) {
+                    log('오프라인 오류 감지 - 복구 시도...', 'warning');
+                    await testOfflineRecovery();
+                }
+            }
+        }
+
+        // 프로필 저장 테스트
+        async function testSaveProfile() {
+            log('프로필 저장 테스트 시작...');
+            
+            try {
+                if (!currentUser) {
+                    throw new Error('로그인이 필요합니다.');
+                }
+                
+                const testProfile = {
+                    uid: currentUser.uid,
+                    email: currentUser.email,
+                    nickname: '테스트 사용자',
+                    gender: 'test',
+                    birthdate: '1990-01-01',
+                    bio: 'Firebase 연결 테스트용 프로필',
+                    profilePictureURL: '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('users').doc(currentUser.uid).set(testProfile, { merge: true });
+                
+                // 저장 확인
+                const savedDoc = await db.collection('users').doc(currentUser.uid).get();
+                if (savedDoc.exists) {
+                    log('프로필 저장 및 확인 완료', 'success');
+                    updateStatus('firestore', 'success', '✅ 프로필 저장 성공');
+                } else {
+                    throw new Error('프로필이 저장되지 않았습니다.');
+                }
+                
+            } catch (error) {
+                log(`프로필 저장 테스트 실패: ${error.message}`, 'error');
+                updateStatus('firestore', 'error', `❌ 프로필 저장 실패: ${error.message}`);
+                
+                // 오프라인 오류인 경우 복구 시도
+                if (error.message && error.message.includes('offline')) {
+                    log('오프라인 오류 감지 - 복구 후 재시도...', 'warning');
+                    await testOfflineRecovery();
+                    
+                    // 재시도
+                    setTimeout(() => testSaveProfile(), 2000);
+                }
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            log('오프라인 문제 해결 테스트 페이지 시작');
+            
+            // 네트워크 상태 모니터링
+            checkNetworkStatus();
+            window.addEventListener('online', () => {
+                log('네트워크 연결 복구됨', 'success');
+                checkNetworkStatus();
+            });
+            window.addEventListener('offline', () => {
+                log('네트워크 연결 끊어짐', 'error');
+                checkNetworkStatus();
+            });
+            
+            // Firebase 자동 초기화
+            initializeFirebase();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>채팅 목록 - 캠퍼스 매칭</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .chat-list-container {
+            padding: 20px;
+        }
+        .chat-list-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .chat-list-item:hover {
+            background-color: #f8f9fa;
+        }
+        .chat-list-item img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+        .chat-list-item .info h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.1rem;
+            color: #333;
+        }
+        .chat-list-item .info p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #777;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .no-chats {
+            text-align: center;
+            margin-top: 50px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="matching.html" style="float: left; text-decoration: none; font-size: 1.5rem; color: #007aff;">&lt;</a>
+            <h1>채팅 목록</h1>
+        </header>
+        <main class="chat-list-container" id="chat-list-main">
+            <!-- Chat list items will be injected here -->
+            <div class="no-chats" id="no-chats-message" style="display: none;">
+                <p>아직 진행중인 대화가 없어요. <br>새로운 매칭을 찾아보세요!</p>
+            </div>
+        </main>
+        <footer>
+            <p>&copy; 2025 캠퍼스 매칭</p>
+        </footer>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <script src="js/firebase-config.js"></script>
+    <script src="js/chat_list.js"></script>
+</body>
+</html>

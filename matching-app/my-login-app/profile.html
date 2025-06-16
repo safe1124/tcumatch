@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로필 설정 - 캠퍼스 매칭</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>프로필 설정</h1>
+        </header>
+        <main>
+            <form id="profile-form" onsubmit="return false;">
+                <div class="form-group">
+                    <label for="profile-pic">프로필 사진</label>
+                    <input type="file" id="profile-pic" name="profile-pic" accept="image/*">
+                </div>
+                <div class="form-group">
+                    <label for="nickname">닉네임</label>
+                    <input type="text" id="nickname" name="nickname" required>
+                </div>
+                <div class="form-group">
+                    <label for="gender">성별</label>
+                    <select id="gender" name="gender" required>
+                        <option value="">선택하세요...</option>
+                        <option value="male">남성</option>
+                        <option value="female">여성</option>
+                        <option value="other">기타</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="birthdate">생년월일</label>
+                    <input type="date" id="birthdate" name="birthdate" required>
+                </div>
+                <div class="form-group">
+                    <label for="bio">자기소개</label>
+                    <textarea id="bio" name="bio" rows="4" placeholder="간단한 자기소개를 입력해주세요."></textarea>
+                </div>
+                <button type="button" id="save-profile-btn" class="btn" onclick="handleProfileSubmit(event)">프로필 저장</button>
+            </form>
+            
+            <!-- 디버깅 패널 추가 -->
+            <div id="debug-panel" style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; display: none;">
+                <h3>🔧 디버깅 정보</h3>
+                <div id="debug-info">
+                    <p><strong>Firebase 상태:</strong> <span id="firebase-status">확인 중...</span></p>
+                    <p><strong>Supabase 상태:</strong> <span id="supabase-status">확인 중...</span></p>
+                    <p><strong>인증 상태:</strong> <span id="auth-status">확인 중...</span></p>
+                    <p><strong>마지막 동작:</strong> <span id="last-action">없음</span></p>
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid #dee2e6; padding-top: 15px;">
+                    <h4>🛠️ 관리 도구</h4>
+                    <button type="button" onclick="testFirebaseConnection()" style="margin: 5px;">Firebase 연결 테스트</button>
+                    <button type="button" onclick="testSupabaseConnection()" style="margin: 5px;">Supabase 연결 테스트</button>
+                    <button type="button" onclick="testProfileSave()" style="margin: 5px; background-color: #17a2b8; color: white;">🧪 테스트 프로필 저장</button>
+                    <button type="button" onclick="createProfilesTableAutomatically()" style="margin: 5px; background-color: #28a745; color: white;">📋 Supabase 테이블 생성</button>
+                    <button type="button" onclick="ensureProfilesTableExists()" style="margin: 5px;">🔍 테이블 확인</button>
+                    <button type="button" onclick="checkAndReconnectFirebase()" style="margin: 5px;">🔄 Firebase 재연결</button>
+                </div>
+                <button type="button" onclick="toggleDebugPanel()" style="margin: 5px;">패널 숨기기</button>
+            </div>
+            <button type="button" onclick="toggleDebugPanel()" style="margin-top: 10px; font-size: 12px; padding: 5px 10px;">🔧 디버깅 패널 토글</button>
+        </main>
+        <footer>
+            <p>&copy; 2025 캠퍼스 매칭</p>
+        </footer>
+    </div>
+    
+    <!-- Firebase SDKs - 인증용 -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+
+    <!-- Supabase SDK - 프로필 데이터 저장용 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- 설정 파일들 -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/supabase-config.js"></script>
+    
+    <!-- 프로필 관련 로직 로드 -->
+    <script src="js/profile.js"></script> 
+</body>
+</html>

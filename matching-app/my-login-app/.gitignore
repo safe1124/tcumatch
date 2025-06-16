@@ -1,0 +1,28 @@
+# Files and directories to ignore in version control
+
+# Node modules
+node_modules/
+
+# Log files
+*.log
+
+# Environment variables file
+.env
+
+# OS-generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE-specific files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

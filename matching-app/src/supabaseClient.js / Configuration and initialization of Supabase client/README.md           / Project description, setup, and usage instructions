@@ -1,0 +1,37 @@
+Here are the contents for the specified files:
+
+**File: /matching-app/matching-app/src/supabaseClient.js**
+
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'YOUR_SUPABASE_URL';
+const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export default supabase;
+
+---
+
+**File: /matching-app/matching-app/package.json**
+
+{
+  "name": "matching-app",
+  "version": "1.0.0",
+  "description": "A matching web application for students to connect with each other.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "live-server public",
+    "build": "webpack"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.1",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^4.0.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
