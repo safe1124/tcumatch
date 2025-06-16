@@ -52,6 +52,15 @@ if (typeof firebase !== 'undefined') {
       if (typeof firebase.auth === 'function') {
         const auth = firebase.auth();
         console.log("✅ Firebase Auth 사용 가능");
+        
+        // Firebase 에러 처리 개선
+        firebase.auth().onAuthStateChanged((user) => {
+          if (user) {
+              console.log("✅ 사용자 로그인 성공:", user.email);
+          } else {
+              console.log("❌ 사용자 로그아웃 상태");
+          }
+        });
       } else {
         console.warn("⚠️ Firebase Auth SDK가 로드되지 않음");
       }
@@ -73,5 +82,11 @@ if (typeof firebase !== 'undefined') {
 } else {
   console.error("❌ Firebase SDK가 로드되지 않음 - CDN 링크를 확인하세요");
 }
+
+// 도메인 에러 디버깅 정보 추가
+console.log("🌐 현재 도메인 정보:");
+console.log("- hostname:", window.location.hostname);
+console.log("- origin:", window.location.origin);
+console.log("- href:", window.location.href);
 
 console.log("firebase-config.js 로드 완료");

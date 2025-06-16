@@ -100,7 +100,18 @@ async function handleGoogleSignIn() {
                 errorMessage = "팝업이 차단되었습니다. 팝업 차단을 해제하고 다시 시도해주세요.";
                 break;
             case 'auth/unauthorized-domain':
-                errorMessage = "인증되지 않은 도메인입니다. Firebase 설정을 확인해주세요.";
+                errorMessage = `인증되지 않은 도메인입니다. 
+                
+🔧 해결 방법:
+1. Firebase Console (https://console.firebase.google.com/) 접속
+2. 프로젝트 'pairs-fe831' 선택
+3. Authentication > Settings > Authorized domains
+4. 현재 도메인 추가: ${window.location.hostname}
+
+관리자에게 문의하거나 잠시 후 다시 시도해주세요.`;
+                break;
+            case 'auth/operation-not-allowed':
+                errorMessage = "Google 로그인이 활성화되지 않았습니다. Firebase 설정을 확인해주세요.";
                 break;
             default:
                 errorMessage = `로그인 오류: ${error.message}`;
