@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로필 저장 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 600px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            margin: 10px 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        #log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>프로필 저장 테스트</h1>
+    
+    <div id="auth-status" class="status warning">
+        로그인이 필요합니다.
+        <button onclick="loginWithGoogle()">Google 로그인</button>
+    </div>
+    
+    <form id="test-profile-form" style="display: none;">
+        <div class="form-group">
+            <label for="nickname">닉네임</label>
+            <input type="text" id="nickname" value="테스트닉네임" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="gender">성별</label>
+            <select id="gender" required>
+                <option value="">선택하세요</option>
+                <option value="male" selected>남성</option>
+                <option value="female">여성</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="birthdate">생년월일</label>
+            <input type="date" id="birthdate" value="1990-01-01" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="bio">자기소개</label>
+            <textarea id="bio" rows="4">안녕하세요! 테스트 프로필입니다.</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="profile-picture">프로필 사진 (선택사항)</label>
+            <input type="file" id="profile-picture" accept="image/*">
+        </div>
+        
+        <button type="submit" id="save-btn">프로필 저장 테스트</button>
+        <button type="button" onclick="loadExistingProfile()">기존 프로필 불러오기</button>
+        <button type="button" onclick="deleteTestProfile()">테스트 프로필 삭제</button>
+    </form>
+    
+    <div id="status-display"></div>
+    
+    <div>
+        <h3>실시간 로그</h3>
+        <button onclick="clearLog()">로그 지우기</button>
+        <div id="log"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-storage.js"></script>
+    
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        let auth, db, storage;
+        let currentUser = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log');
+            const typePrefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${typePrefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status-display');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function updateAuthStatus(user) {
+            const authDiv = document.getElementById('auth-status');
+            const form = document.getElementById('test-profile-form');
+            
+            if (user) {
+                authDiv.innerHTML = `<div class="status success">로그인됨: ${user.email}</div>`;
+                form.style.display = 'block';
+                currentUser = user;
+                log(`사용자 로그인: ${user.email}`, 'success');
+            } else {
+                authDiv.innerHTML = `<div class="status warning">로그인이 필요합니다. <button onclick="loginWithGoogle()">Google 로그인</button></div>`;
+                form.style.display = 'none';
+                currentUser = null;
+                log('사용자 로그아웃', 'info');
+            }
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            log('프로필 저장 테스트 페이지 시작');
+            
+            try {
+                auth = firebase.auth();
+                db = firebase.firestore();
+                storage = firebase.storage();
+                
+                log('Firebase 서비스 초기화 완료', 'success');
+                
+                // 인증 상태 리스너
+                auth.onAuthStateChanged(updateAuthStatus);
+                
+                // 폼 이벤트 리스너
+                document.getElementById('test-profile-form').addEventListener('submit', handleProfileSave);
+                
+            } catch (error) {
+                log(`Firebase 초기화 오류: ${error.message}`, 'error');
+            }
+        });
+
+        // Google 로그인
+        async function loginWithGoogle() {
+            try {
+                log('Google 로그인 시작...');
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.addScope('email');
+                provider.addScope('profile');
+                
+                const result = await auth.signInWithPopup(provider);
+                log(`Google 로그인 성공: ${result.user.email}`, 'success');
+            } catch (error) {
+                log(`Google 로그인 실패: ${error.message}`, 'error');
+                showStatus(`로그인 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // 프로필 저장 처리
+        async function handleProfileSave(event) {
+            event.preventDefault();
+            
+            if (!currentUser) {
+                showStatus('로그인이 필요합니다.', 'error');
+                return;
+            }
+
+            const saveBtn = document.getElementById('save-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = '저장 중...';
+            
+            try {
+                log('=== 프로필 저장 테스트 시작 ===');
+                showStatus('프로필 저장 중...', 'info');
+
+                // 폼 데이터 수집
+                const nickname = document.getElementById('nickname').value.trim();
+                const gender = document.getElementById('gender').value;
+                const birthdate = document.getElementById('birthdate').value;
+                const bio = document.getElementById('bio').value.trim();
+                const profilePicFile = document.getElementById('profile-picture').files[0];
+
+                log(`수집된 데이터: 닉네임=${nickname}, 성별=${gender}, 생일=${birthdate}`);
+
+                // 유효성 검사
+                if (!nickname || !gender || !birthdate) {
+                    throw new Error('필수 필드를 모두 입력해주세요.');
+                }
+
+                // 프로필 사진 업로드 (있다면)
+                let profilePictureURL = '';
+                if (profilePicFile) {
+                    log('프로필 사진 업로드 시작...');
+                    profilePictureURL = await uploadProfilePicture(profilePicFile);
+                    log(`프로필 사진 업로드 완료: ${profilePictureURL}`, 'success');
+                }
+
+                // Firestore에 저장
+                const profileData = {
+                    uid: currentUser.uid,
+                    email: currentUser.email,
+                    nickname: nickname,
+                    gender: gender,
+                    birthdate: birthdate,
+                    bio: bio,
+                    profilePictureURL: profilePictureURL,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                log('Firestore에 프로필 저장 시작...');
+                log(`저장할 데이터: ${JSON.stringify(profileData, null, 2)}`);
+
+                const startTime = Date.now();
+                await db.collection('users').doc(currentUser.uid).set(profileData, { merge: true });
+                const endTime = Date.now();
+
+                log(`Firestore 저장 완료 (소요시간: ${endTime - startTime}ms)`, 'success');
+
+                // 저장 확인
+                log('저장 확인을 위한 데이터 읽기...');
+                const savedDoc = await db.collection('users').doc(currentUser.uid).get();
+                if (savedDoc.exists) {
+                    log('저장 확인 완료!', 'success');
+                    const savedData = savedDoc.data();
+                    log(`저장된 데이터: ${JSON.stringify(savedData, null, 2)}`);
+                    showStatus('프로필이 성공적으로 저장되었습니다!', 'success');
+                } else {
+                    throw new Error('저장 확인 실패 - 문서가 존재하지 않음');
+                }
+
+                log('=== 프로필 저장 테스트 완료 ===', 'success');
+
+            } catch (error) {
+                log(`프로필 저장 실패: ${error.message}`, 'error');
+                showStatus(`저장 실패: ${error.message}`, 'error');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '프로필 저장 테스트';
+            }
+        }
+
+        // 프로필 사진 업로드
+        async function uploadProfilePicture(file) {
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            if (file.size > maxSize) {
+                throw new Error(`파일이 너무 큽니다. 최대 5MB (현재: ${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+            }
+
+            if (!file.type.startsWith('image/')) {
+                throw new Error(`이미지 파일만 업로드 가능합니다. (현재: ${file.type})`);
+            }
+
+            const filePath = `test_profile_pictures/${currentUser.uid}/${Date.now()}_${file.name}`;
+            log(`Storage 업로드 경로: ${filePath}`);
+
+            const storageRef = storage.ref(filePath);
+            
+            return new Promise((resolve, reject) => {
+                const uploadTask = storageRef.put(file);
+                
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        log(`업로드 진행률: ${progress.toFixed(2)}%`);
+                    },
+                    (error) => {
+                        log(`Storage 업로드 실패: ${error.message}`, 'error');
+                        reject(error);
+                    },
+                    async () => {
+                        try {
+                            const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                            resolve(downloadURL);
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }
+                );
+            });
+        }
+
+        // 기존 프로필 불러오기
+        async function loadExistingProfile() {
+            if (!currentUser) {
+                showStatus('로그인이 필요합니다.', 'error');
+                return;
+            }
+
+            try {
+                log('기존 프로필 불러오기 시작...');
+                
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    log(`기존 프로필 발견: ${JSON.stringify(userData, null, 2)}`);
+                    
+                    // 폼에 데이터 채우기
+                    if (userData.nickname) document.getElementById('nickname').value = userData.nickname;
+                    if (userData.gender) document.getElementById('gender').value = userData.gender;
+                    if (userData.birthdate) document.getElementById('birthdate').value = userData.birthdate;
+                    if (userData.bio) document.getElementById('bio').value = userData.bio;
+                    
+                    showStatus('기존 프로필을 불러왔습니다.', 'success');
+                } else {
+                    log('기존 프로필이 없습니다.');
+                    showStatus('저장된 프로필이 없습니다.', 'info');
+                }
+                
+            } catch (error) {
+                log(`프로필 불러오기 실패: ${error.message}`, 'error');
+                showStatus(`불러오기 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // 테스트 프로필 삭제
+        async function deleteTestProfile() {
+            if (!currentUser) {
+                showStatus('로그인이 필요합니다.', 'error');
+                return;
+            }
+
+            if (!confirm('정말로 프로필을 삭제하시겠습니까?')) {
+                return;
+            }
+
+            try {
+                log('프로필 삭제 시작...');
+                
+                await db.collection('users').doc(currentUser.uid).delete();
+                
+                log('프로필 삭제 완료', 'success');
+                showStatus('프로필이 삭제되었습니다.', 'success');
+                
+                // 폼 초기화
+                document.getElementById('test-profile-form').reset();
+                
+            } catch (error) {
+                log(`프로필 삭제 실패: ${error.message}`, 'error');
+                showStatus(`삭제 실패: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

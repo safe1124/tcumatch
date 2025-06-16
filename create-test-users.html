@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>테스트 사용자 생성 - 캠퍼스 매칭</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f9f9f9;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        #log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 테스트 사용자 생성 도구</h1>
+        <p>매칭 기능을 테스트하기 위한 가짜 사용자 데이터를 생성합니다.</p>
+        
+        <div class="status info">
+            <strong>주의:</strong> 이 도구는 개발/테스트 목적으로만 사용하세요.
+        </div>
+        
+        <div>
+            <button onclick="createTestUsers()">테스트 사용자 5명 생성</button>
+            <button onclick="clearTestUsers()">테스트 사용자 삭제</button>
+            <button onclick="showCurrentUsers()">현재 사용자 목록</button>
+        </div>
+        
+        <div id="status" class="status" style="display: none;">
+            상태 메시지가 여기에 표시됩니다.
+        </div>
+        
+        <h3>실시간 로그</h3>
+        <button onclick="clearLog()">로그 지우기</button>
+        <div id="log"></div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+    
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        let db;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log');
+            const typePrefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${typePrefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                db = firebase.firestore();
+                log('Firebase 초기화 완료', 'success');
+            } catch (error) {
+                log(`Firebase 초기화 오류: ${error.message}`, 'error');
+            }
+        });
+
+        // 테스트 사용자 데이터
+        const testUsersData = [
+            {
+                id: 'test-user-1',
+                nickname: '김철수',
+                gender: 'male',
+                birthdate: '1995-03-15',
+                bio: '안녕하세요! 컴퓨터공학과 재학중입니다. 게임과 영화를 좋아해요.',
+                email: 'test1@example.com',
+                profilePictureURL: '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            {
+                id: 'test-user-2',
+                nickname: '박영희',
+                gender: 'female',
+                birthdate: '1997-07-22',
+                bio: '경영학과 3학년이에요. 카페투어와 독서를 즐깁니다!',
+                email: 'test2@example.com',
+                profilePictureURL: '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            {
+                id: 'test-user-3',
+                nickname: '이민수',
+                gender: 'male',
+                birthdate: '1996-11-08',
+                bio: '디자인학과 학생입니다. 여행과 사진찍기를 좋아해요.',
+                email: 'test3@example.com',
+                profilePictureURL: '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            {
+                id: 'test-user-4',
+                nickname: '최서윤',
+                gender: 'female',
+                birthdate: '1998-01-30',
+                bio: '심리학과 2학년이에요. 음악감상과 요리하는 것을 좋아합니다.',
+                email: 'test4@example.com',
+                profilePictureURL: '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            {
+                id: 'test-user-5',
+                nickname: '강태현',
+                gender: 'male',
+                birthdate: '1994-09-12',
+                bio: '기계공학과 대학원생입니다. 헬스와 등산을 즐겨해요!',
+                email: 'test5@example.com',
+                profilePictureURL: '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }
+        ];
+
+        // 테스트 사용자들 생성
+        async function createTestUsers() {
+            if (!db) {
+                showStatus('Firebase가 초기화되지 않았습니다.', 'error');
+                return;
+            }
+
+            try {
+                log('테스트 사용자 생성 시작...', 'info');
+                showStatus('테스트 사용자를 생성하고 있습니다...', 'info');
+
+                const batch = db.batch();
+
+                testUsersData.forEach(userData => {
+                    const { id, ...data } = userData;
+                    const userRef = db.collection('users').doc(id);
+                    batch.set(userRef, data);
+                });
+
+                await batch.commit();
+
+                log('테스트 사용자 생성 완료', 'success');
+                showStatus('✅ 테스트 사용자 5명이 성공적으로 생성되었습니다!', 'success');
+
+                // 생성된 사용자 목록 표시
+                setTimeout(showCurrentUsers, 1000);
+
+            } catch (error) {
+                log(`테스트 사용자 생성 오류: ${error.message}`, 'error');
+                showStatus(`❌ 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 테스트 사용자들 삭제
+        async function clearTestUsers() {
+            if (!db) {
+                showStatus('Firebase가 초기화되지 않았습니다.', 'error');
+                return;
+            }
+
+            if (!confirm('정말로 테스트 사용자들을 삭제하시겠습니까?')) {
+                return;
+            }
+
+            try {
+                log('테스트 사용자 삭제 시작...', 'info');
+                showStatus('테스트 사용자를 삭제하고 있습니다...', 'info');
+
+                const batch = db.batch();
+
+                testUsersData.forEach(userData => {
+                    const userRef = db.collection('users').doc(userData.id);
+                    batch.delete(userRef);
+                });
+
+                await batch.commit();
+
+                log('테스트 사용자 삭제 완료', 'success');
+                showStatus('✅ 테스트 사용자들이 성공적으로 삭제되었습니다!', 'success');
+
+            } catch (error) {
+                log(`테스트 사용자 삭제 오류: ${error.message}`, 'error');
+                showStatus(`❌ 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 현재 사용자 목록 표시
+        async function showCurrentUsers() {
+            if (!db) {
+                showStatus('Firebase가 초기화되지 않았습니다.', 'error');
+                return;
+            }
+
+            try {
+                log('사용자 목록 조회 중...', 'info');
+
+                const snapshot = await db.collection('users').get();
+                
+                log(`총 ${snapshot.size}명의 사용자가 있습니다:`, 'info');
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    log(`- ${data.nickname} (${data.gender}, ${calculateAge(data.birthdate)}세)`, 'info');
+                });
+
+                if (snapshot.size === 0) {
+                    log('등록된 사용자가 없습니다.', 'info');
+                }
+
+                showStatus(`현재 ${snapshot.size}명의 사용자가 등록되어 있습니다.`, 'info');
+
+            } catch (error) {
+                log(`사용자 목록 조회 오류: ${error.message}`, 'error');
+                showStatus(`❌ 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 나이 계산
+        function calculateAge(birthdate) {
+            const birth = new Date(birthdate);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const monthDiff = today.getMonth() - birth.getMonth();
+            
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+            
+            return age;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로필 수정 - 캠퍼스 매칭</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .edit-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .edit-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .current-image {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .current-image img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #ff6b6b;
+        }
+        
+        .current-image .placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: #f8f9fa;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: #6c757d;
+            border: 3px solid #ff6b6b;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        
+        .btn-save {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            flex: 2;
+            transition: transform 0.2s;
+        }
+        
+        .btn-save:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-save:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            flex: 1;
+            transition: transform 0.2s;
+        }
+        
+        .btn-cancel:hover {
+            transform: translateY(-2px);
+            background: #5a6268;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="edit-container">
+            <div class="edit-header">
+                <h1>프로필 수정</h1>
+            </div>
+            
+            <div class="current-image">
+                <div id="current-profile-image" class="placeholder">👤</div>
+                <p style="margin-top: 10px; color: #666; font-size: 14px;">현재 프로필 사진</p>
+            </div>
+            
+            <form id="profile-edit-form">
+                <div class="form-group">
+                    <label for="profile-pic">새 프로필 사진</label>
+                    <input type="file" id="profile-pic" name="profile-pic" accept="image/*">
+                    <small style="color: #666; font-size: 12px;">새 사진을 선택하지 않으면 기존 사진이 유지됩니다.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="nickname">닉네임 *</label>
+                    <input type="text" id="nickname" name="nickname" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gender">성별 *</label>
+                    <select id="gender" name="gender" required>
+                        <option value="">선택하세요...</option>
+                        <option value="male">남성</option>
+                        <option value="female">여성</option>
+                        <option value="other">기타</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="birthdate">생년월일 *</label>
+                    <input type="date" id="birthdate" name="birthdate" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bio">자기소개</label>
+                    <textarea id="bio" name="bio" rows="4" placeholder="간단한 자기소개를 입력해주세요."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-save">변경사항 저장</button>
+                    <button type="button" onclick="cancelEdit()" class="btn-cancel">취소</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 로딩 오버레이 -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <p>프로필을 업데이트하는 중...</p>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+    
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        let auth, db, storage;
+        let currentUser = null;
+        let currentProfileData = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("프로필 수정 페이지 로드");
+            
+            try {
+                // Firebase 서비스 초기화
+                auth = firebase.auth();
+                db = firebase.firestore();
+                storage = firebase.storage();
+                
+                // 인증 상태 리스너
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        currentUser = user;
+                        console.log("사용자 인증됨:", user.email);
+                        loadCurrentProfile();
+                    } else {
+                        console.log("사용자 인증되지 않음 - 로그인 페이지로 이동");
+                        window.location.href = 'index.html';
+                    }
+                });
+                
+                // 폼 제출 이벤트 리스너
+                document.getElementById('profile-edit-form').addEventListener('submit', handleFormSubmit);
+                
+            } catch (error) {
+                console.error("Firebase 초기화 오류:", error);
+                alert('초기화 오류가 발생했습니다.');
+            }
+        });
+
+        // 현재 프로필 로드
+        async function loadCurrentProfile() {
+            try {
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                
+                if (userDoc.exists) {
+                    currentProfileData = userDoc.data();
+                    console.log("현재 프로필 데이터:", currentProfileData);
+                    fillForm(currentProfileData);
+                } else {
+                    console.log("프로필이 존재하지 않음");
+                    alert("프로필이 존재하지 않습니다. 프로필을 먼저 생성해주세요.");
+                    window.location.href = 'profile.html';
+                }
+                
+            } catch (error) {
+                console.error("프로필 로드 오류:", error);
+                alert('프로필을 불러올 수 없습니다.');
+            }
+        }
+
+        // 폼에 기존 데이터 채우기
+        function fillForm(profileData) {
+            document.getElementById('nickname').value = profileData.nickname || '';
+            document.getElementById('gender').value = profileData.gender || '';
+            document.getElementById('birthdate').value = profileData.birthdate || '';
+            document.getElementById('bio').value = profileData.bio || '';
+            
+            // 현재 프로필 사진 표시
+            if (profileData.profilePictureURL) {
+                document.getElementById('current-profile-image').innerHTML = 
+                    `<img src="${profileData.profilePictureURL}" alt="현재 프로필 사진">`;
+            }
+        }
+
+        // 폼 제출 처리
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            console.log("프로필 수정 제출");
+            
+            // 로딩 표시
+            showLoading();
+            
+            try {
+                // 폼 데이터 수집
+                const formData = {
+                    nickname: document.getElementById('nickname').value.trim(),
+                    gender: document.getElementById('gender').value,
+                    birthdate: document.getElementById('birthdate').value,
+                    bio: document.getElementById('bio').value.trim(),
+                    profilePicFile: document.getElementById('profile-pic').files[0]
+                };
+                
+                // 유효성 검사
+                if (!validateFormData(formData)) {
+                    hideLoading();
+                    return;
+                }
+                
+                // 새 프로필 사진 업로드 (선택된 경우)
+                let profilePictureURL = currentProfileData.profilePictureURL || '';
+                if (formData.profilePicFile) {
+                    console.log("새 프로필 사진 업로드 시작");
+                    profilePictureURL = await uploadProfilePicture(formData.profilePicFile);
+                    console.log("새 프로필 사진 업로드 완료:", profilePictureURL);
+                }
+                
+                // Firestore 업데이트
+                const updatedProfile = {
+                    nickname: formData.nickname,
+                    gender: formData.gender,
+                    birthdate: formData.birthdate,
+                    bio: formData.bio,
+                    profilePictureURL: profilePictureURL,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('users').doc(currentUser.uid).update(updatedProfile);
+                
+                console.log("프로필 업데이트 완료");
+                hideLoading();
+                
+                alert("프로필이 성공적으로 업데이트되었습니다!");
+                window.location.href = 'my-profile.html';
+                
+            } catch (error) {
+                console.error("프로필 업데이트 오류:", error);
+                hideLoading();
+                alert(`프로필 업데이트 중 오류가 발생했습니다: ${error.message}`);
+            }
+        }
+
+        // 유효성 검사
+        function validateFormData(formData) {
+            if (!formData.nickname) {
+                alert("닉네임을 입력해주세요.");
+                return false;
+            }
+            
+            if (!formData.gender) {
+                alert("성별을 선택해주세요.");
+                return false;
+            }
+            
+            if (!formData.birthdate) {
+                alert("생년월일을 입력해주세요.");
+                return false;
+            }
+            
+            // 나이 검사
+            const birthDate = new Date(formData.birthdate);
+            const today = new Date();
+            const age = today.getFullYear() - birthDate.getFullYear();
+            
+            if (age < 18 || age > 100) {
+                alert("나이는 18세 이상 100세 이하여야 합니다.");
+                return false;
+            }
+            
+            return true;
+        }
+
+        // 프로필 사진 업로드
+        async function uploadProfilePicture(file) {
+            try {
+                // 파일 크기 검사 (5MB 제한)
+                const maxSize = 5 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    throw new Error("프로필 사진은 5MB 이하여야 합니다.");
+                }
+                
+                // 파일 형식 검사
+                if (!file.type.startsWith('image/')) {
+                    throw new Error("이미지 파일만 업로드 가능합니다.");
+                }
+                
+                // Storage 경로 생성
+                const filePath = `profile_pictures/${currentUser.uid}/${Date.now()}_${file.name}`;
+                const storageRef = storage.ref(filePath);
+                
+                // 파일 업로드
+                const uploadTask = await storageRef.put(file);
+                
+                // 다운로드 URL 획득
+                const downloadURL = await uploadTask.ref.getDownloadURL();
+                
+                return downloadURL;
+                
+            } catch (error) {
+                console.error("프로필 사진 업로드 오류:", error);
+                throw error;
+            }
+        }
+
+        // 수정 취소
+        function cancelEdit() {
+            if (confirm("변경사항이 저장되지 않습니다. 정말 취소하시겠습니까?")) {
+                window.location.href = 'my-profile.html';
+            }
+        }
+
+        // 로딩 표시/숨김
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

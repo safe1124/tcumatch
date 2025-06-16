@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - 캠퍼스 매칭</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>로그인</h1>
+        </header>
+        <main>
+            <button id="google-login-btn" class="btn google-btn">Google 계정으로 로그인</button>
+            <p class="link-text">계정이 없으신가요? <a href="signup.html">Google 계정으로 시작하기</a></p>
+        </main>
+        <footer>
+            <p>&copy; 2025 캠퍼스 매칭</p>
+        </footer>
+    </div>
+
+    <!-- Firebase SDKs - 순서 중요 -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
+
+    <!-- Firebase 설정을 먼저 로드 -->
+    <script src="js/firebase-config.js"></script>
+    
+    <!-- 인증 로직 로드 -->
+    <script src="js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>채팅 - 캠퍼스 매칭</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 180px); /* Adjust based on header/footer/padding */
+            overflow: hidden; /* Prevent main container scroll */
+        }
+        .chat-header {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+            background-color: #f8f9fa;
+            text-align: center; /* Center title */
+            position: relative; /* For back button positioning */
+        }
+        .chat-header .back-link {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            color: #007aff;
+            text-decoration: none;
+        }
+        .chat-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #333;
+        }
+        .messages-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            line-height: 1.4;
+            font-size: 0.95rem;
+        }
+        .message.sent {
+            background-color: #007aff;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .message.received {
+            background-color: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .message .timestamp {
+            font-size: 0.75rem;
+            color: #999; /* Adjust color for sent/received if needed */
+            display: block;
+            margin-top: 5px;
+            text-align: right;
+        }
+        .message.sent .timestamp {
+            color: #f0f0f0;
+        }
+
+        .message-input-area {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #e9ecef;
+            background-color: #f8f9fa;
+        }
+        .message-input-area input[type="text"] {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ced4da;
+            border-radius: 20px;
+            margin-right: 10px;
+            font-size: 1rem;
+        }
+        .message-input-area input[type="text"]:focus {
+            outline: none;
+            border-color: #007aff;
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+        }
+        .message-input-area button {
+            padding: 12px 20px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        .message-input-area button:hover {
+            background-color: #005bb5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="padding:0;"> <!-- Remove padding for full-width chat UI -->
+        <div class="chat-header">
+            <a href="chat_list.html" class="back-link">&lt;</a>
+            <h2 id="chat-with-name">채팅 상대</h2>
+        </div>
+        <div class="chat-container">
+            <div class="messages-area" id="messages-area">
+                <!-- Messages will be loaded here -->
+            </div>
+            <form class="message-input-area" id="message-form">
+                <input type="text" id="message-input" placeholder="메시지를 입력하세요..." autocomplete="off">
+                <button type="submit">전송</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <script src="js/firebase-config.js"></script>
+    <script src="js/chat.js"></script>
+</body>
+</html>

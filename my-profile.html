@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 프로필 - 캠퍼스 매칭</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .profile-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .profile-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .profile-image-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 20px;
+        }
+        
+        .profile-image {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #ff6b6b;
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            color: #6c757d;
+        }
+        
+        .profile-info {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .info-value {
+            color: #666;
+            text-align: right;
+            flex: 1;
+            margin-left: 10px;
+        }
+        
+        .bio-section {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .bio-text {
+            line-height: 1.6;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn-edit {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            flex: 1;
+            transition: transform 0.2s;
+        }
+        
+        .btn-edit:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-back {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            flex: 1;
+            transition: transform 0.2s;
+        }
+        
+        .btn-back:hover {
+            transform: translateY(-2px);
+            background: #5a6268;
+        }
+        
+        .age-badge {
+            background: #ff6b6b;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="profile-container">
+            <!-- 로딩 상태 -->
+            <div id="loading" class="loading">
+                <p>프로필을 불러오는 중...</p>
+            </div>
+            
+            <!-- 오류 상태 -->
+            <div id="error" class="error" style="display: none;">
+                <p>프로필을 불러올 수 없습니다.</p>
+                <button onclick="loadProfile()" class="btn-edit">다시 시도</button>
+            </div>
+            
+            <!-- 프로필 내용 -->
+            <div id="profile-content" style="display: none;">
+                <div class="profile-header">
+                    <h1>내 프로필</h1>
+                    <div class="profile-image-container">
+                        <div id="profile-image" class="profile-image">
+                            👤
+                        </div>
+                    </div>
+                    <h2 id="profile-nickname">닉네임</h2>
+                </div>
+                
+                <div class="profile-info">
+                    <div class="info-row">
+                        <span class="info-label">성별</span>
+                        <span id="profile-gender" class="info-value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">나이</span>
+                        <span id="profile-age" class="info-value">
+                            <span class="age-badge">-</span>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">이메일</span>
+                        <span id="profile-email" class="info-value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">가입일</span>
+                        <span id="profile-created" class="info-value">-</span>
+                    </div>
+                </div>
+                
+                <div class="bio-section">
+                    <h3>자기소개</h3>
+                    <div id="profile-bio" class="bio-text">
+                        자기소개가 없습니다.
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button onclick="editProfile()" class="btn-edit">프로필 수정</button>
+                    <button onclick="goBack()" class="btn-back">돌아가기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+    
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        let auth, db, storage;
+        let currentUser = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("프로필 보기 페이지 로드");
+            
+            try {
+                // Firebase 서비스 초기화
+                auth = firebase.auth();
+                db = firebase.firestore();
+                storage = firebase.storage();
+                
+                // 인증 상태 리스너
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        currentUser = user;
+                        console.log("사용자 인증됨:", user.email);
+                        loadProfile();
+                    } else {
+                        console.log("사용자 인증되지 않음 - 로그인 페이지로 이동");
+                        window.location.href = 'index.html';
+                    }
+                });
+                
+            } catch (error) {
+                console.error("Firebase 초기화 오류:", error);
+                showError();
+            }
+        });
+
+        // 프로필 로드
+        async function loadProfile() {
+            if (!currentUser) {
+                console.error("사용자가 로그인되지 않음");
+                showError();
+                return;
+            }
+
+            try {
+                console.log("프로필 데이터 로드 중...");
+                showLoading();
+
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    console.log("프로필 데이터:", userData);
+                    displayProfile(userData);
+                } else {
+                    console.log("프로필이 존재하지 않음");
+                    alert("프로필이 존재하지 않습니다. 프로필을 먼저 생성해주세요.");
+                    window.location.href = 'profile.html';
+                }
+                
+            } catch (error) {
+                console.error("프로필 로드 오류:", error);
+                showError();
+            }
+        }
+
+        // 프로필 화면에 표시
+        function displayProfile(userData) {
+            // 기본 정보 표시
+            document.getElementById('profile-nickname').textContent = userData.nickname || '닉네임 없음';
+            document.getElementById('profile-gender').textContent = getGenderText(userData.gender);
+            document.getElementById('profile-email').textContent = userData.email || currentUser.email;
+            
+            // 나이 계산 및 표시
+            if (userData.birthdate) {
+                const age = calculateAge(userData.birthdate);
+                document.getElementById('profile-age').innerHTML = `<span class="age-badge">${age}세</span>`;
+            }
+            
+            // 자기소개
+            if (userData.bio && userData.bio.trim()) {
+                document.getElementById('profile-bio').textContent = userData.bio;
+            } else {
+                document.getElementById('profile-bio').textContent = "자기소개가 없습니다.";
+            }
+            
+            // 가입일
+            if (userData.createdAt) {
+                const createdDate = userData.createdAt.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt);
+                document.getElementById('profile-created').textContent = formatDate(createdDate);
+            }
+            
+            // 프로필 사진
+            if (userData.profilePictureURL) {
+                const profileImage = document.getElementById('profile-image');
+                profileImage.innerHTML = `<img src="${userData.profilePictureURL}" alt="프로필 사진" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+            }
+            
+            showContent();
+        }
+
+        // 성별 텍스트 변환
+        function getGenderText(gender) {
+            switch(gender) {
+                case 'male': return '남성';
+                case 'female': return '여성';
+                case 'other': return '기타';
+                default: return '미설정';
+            }
+        }
+
+        // 나이 계산
+        function calculateAge(birthdate) {
+            const birth = new Date(birthdate);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const monthDiff = today.getMonth() - birth.getMonth();
+            
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+            
+            return age;
+        }
+
+        // 날짜 포맷
+        function formatDate(date) {
+            return date.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // 화면 상태 관리
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('profile-content').style.display = 'none';
+        }
+
+        function showError() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('profile-content').style.display = 'none';
+        }
+
+        function showContent() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('profile-content').style.display = 'block';
+        }
+
+        // 프로필 수정 페이지로 이동
+        function editProfile() {
+            window.location.href = 'profile-edit.html';
+        }
+
+        // 이전 페이지로 돌아가기
+        function goBack() {
+            // 이전 페이지가 있으면 돌아가고, 없으면 매칭 페이지로
+            if (document.referrer && document.referrer !== '') {
+                window.history.back();
+            } else {
+                window.location.href = 'matching.html';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 연결 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Firebase 연결 및 권한 테스트</h1>
+    
+    <div id="auth-status" class="test-section warning">
+        <h3>인증 상태</h3>
+        <p id="auth-info">확인 중...</p>
+        <button onclick="testGoogleLogin()">Google 로그인 테스트</button>
+        <button onclick="testLogout()">로그아웃</button>
+    </div>
+    
+    <div id="firestore-status" class="test-section warning">
+        <h3>Firestore 연결 테스트</h3>
+        <p id="firestore-info">테스트 필요</p>
+        <button onclick="testFirestoreRead()">읽기 테스트</button>
+        <button onclick="testFirestoreWrite()">쓰기 테스트</button>
+        <button onclick="testFirestoreDelete()">삭제 테스트</button>
+    </div>
+    
+    <div id="storage-status" class="test-section warning">
+        <h3>Firebase Storage 테스트</h3>
+        <p id="storage-info">테스트 필요</p>
+        <input type="file" id="test-file" accept="image/*" style="margin: 10px 0;">
+        <button onclick="testStorageUpload()">업로드 테스트</button>
+        <button onclick="testStorageDelete()">삭제 테스트</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>실시간 로그</h3>
+        <button onclick="clearLog()">로그 지우기</button>
+        <div id="log"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-compat-storage.js"></script>
+    
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        let auth, db, storage;
+        let currentUser = null;
+        let testDocId = 'firebase-test-' + Date.now();
+        let testFileName = '';
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log');
+            const typePrefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${typePrefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function updateAuthStatus(user) {
+            const authDiv = document.getElementById('auth-status');
+            const authInfo = document.getElementById('auth-info');
+            
+            if (user) {
+                authDiv.className = 'test-section success';
+                authInfo.innerHTML = `
+                    <strong>로그인됨</strong><br>
+                    이메일: ${user.email}<br>
+                    UID: ${user.uid}<br>
+                    표시명: ${user.displayName || '없음'}
+                `;
+                currentUser = user;
+                log(`사용자 로그인: ${user.email}`, 'success');
+            } else {
+                authDiv.className = 'test-section error';
+                authInfo.textContent = '로그인 필요';
+                currentUser = null;
+                log('사용자 로그아웃', 'info');
+            }
+        }
+
+        function updateFirestoreStatus(success, message) {
+            const div = document.getElementById('firestore-status');
+            const info = document.getElementById('firestore-info');
+            
+            div.className = success ? 'test-section success' : 'test-section error';
+            info.textContent = message;
+        }
+
+        function updateStorageStatus(success, message) {
+            const div = document.getElementById('storage-status');
+            const info = document.getElementById('storage-info');
+            
+            div.className = success ? 'test-section success' : 'test-section error';
+            info.textContent = message;
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Firebase 테스트 페이지 시작');
+            
+            try {
+                auth = firebase.auth();
+                db = firebase.firestore();
+                storage = firebase.storage();
+                
+                log('Firebase 서비스 초기화 완료', 'success');
+                
+                // 인증 상태 리스너
+                auth.onAuthStateChanged(updateAuthStatus);
+                
+            } catch (error) {
+                log(`Firebase 초기화 오류: ${error.message}`, 'error');
+            }
+        });
+
+        // Google 로그인 테스트
+        async function testGoogleLogin() {
+            try {
+                log('Google 로그인 시작...');
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.addScope('email');
+                provider.addScope('profile');
+                
+                const result = await auth.signInWithPopup(provider);
+                log(`Google 로그인 성공: ${result.user.email}`, 'success');
+            } catch (error) {
+                log(`Google 로그인 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // 로그아웃 테스트
+        async function testLogout() {
+            try {
+                await auth.signOut();
+                log('로그아웃 완료', 'success');
+            } catch (error) {
+                log(`로그아웃 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // Firestore 읽기 테스트
+        async function testFirestoreRead() {
+            if (!currentUser) {
+                log('Firestore 읽기 테스트: 로그인이 필요합니다', 'error');
+                return;
+            }
+
+            try {
+                log('Firestore 읽기 테스트 시작...');
+                
+                // 사용자 문서 읽기 시도
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                
+                if (userDoc.exists) {
+                    log('사용자 문서 읽기 성공', 'success');
+                    log(`문서 데이터: ${JSON.stringify(userDoc.data(), null, 2)}`);
+                } else {
+                    log('사용자 문서가 존재하지 않음 (정상)', 'info');
+                }
+                
+                updateFirestoreStatus(true, '읽기 권한 정상');
+                
+            } catch (error) {
+                log(`Firestore 읽기 실패: ${error.message}`, 'error');
+                updateFirestoreStatus(false, `읽기 실패: ${error.message}`);
+            }
+        }
+
+        // Firestore 쓰기 테스트
+        async function testFirestoreWrite() {
+            if (!currentUser) {
+                log('Firestore 쓰기 테스트: 로그인이 필요합니다', 'error');
+                return;
+            }
+
+            try {
+                log('Firestore 쓰기 테스트 시작...');
+                
+                const testData = {
+                    testField: 'Firebase 연결 테스트',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email
+                };
+                
+                // 테스트 문서 작성
+                await db.collection('test').doc(testDocId).set(testData);
+                
+                log('Firestore 쓰기 성공', 'success');
+                updateFirestoreStatus(true, '읽기/쓰기 권한 정상');
+                
+                // 저장된 데이터 확인
+                const savedDoc = await db.collection('test').doc(testDocId).get();
+                if (savedDoc.exists) {
+                    log(`저장 확인 완료: ${JSON.stringify(savedDoc.data(), null, 2)}`);
+                }
+                
+            } catch (error) {
+                log(`Firestore 쓰기 실패: ${error.message}`, 'error');
+                updateFirestoreStatus(false, `쓰기 실패: ${error.message}`);
+            }
+        }
+
+        // Firestore 삭제 테스트
+        async function testFirestoreDelete() {
+            if (!currentUser) {
+                log('Firestore 삭제 테스트: 로그인이 필요합니다', 'error');
+                return;
+            }
+
+            try {
+                log('Firestore 삭제 테스트 시작...');
+                
+                await db.collection('test').doc(testDocId).delete();
+                
+                log('테스트 문서 삭제 성공', 'success');
+                
+            } catch (error) {
+                log(`Firestore 삭제 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // Storage 업로드 테스트
+        async function testStorageUpload() {
+            if (!currentUser) {
+                log('Storage 업로드 테스트: 로그인이 필요합니다', 'error');
+                return;
+            }
+
+            const fileInput = document.getElementById('test-file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('Storage 업로드 테스트: 파일을 선택해주세요', 'error');
+                return;
+            }
+
+            try {
+                log('Storage 업로드 테스트 시작...');
+                
+                testFileName = `test_uploads/${currentUser.uid}/${Date.now()}_${file.name}`;
+                const storageRef = storage.ref(testFileName);
+                
+                log(`업로드 경로: ${testFileName}`);
+                
+                const uploadTask = storageRef.put(file);
+                
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        log(`업로드 진행률: ${progress.toFixed(2)}%`);
+                    },
+                    (error) => {
+                        log(`Storage 업로드 실패: ${error.message}`, 'error');
+                        updateStorageStatus(false, `업로드 실패: ${error.message}`);
+                    },
+                    async () => {
+                        log('Storage 업로드 완료', 'success');
+                        
+                        // 다운로드 URL 가져오기
+                        try {
+                            const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                            log(`다운로드 URL: ${downloadURL}`);
+                            updateStorageStatus(true, '업로드/다운로드 권한 정상');
+                        } catch (urlError) {
+                            log(`다운로드 URL 가져오기 실패: ${urlError.message}`, 'error');
+                        }
+                    }
+                );
+                
+            } catch (error) {
+                log(`Storage 업로드 실패: ${error.message}`, 'error');
+                updateStorageStatus(false, `업로드 실패: ${error.message}`);
+            }
+        }
+
+        // Storage 삭제 테스트
+        async function testStorageDelete() {
+            if (!testFileName) {
+                log('Storage 삭제 테스트: 먼저 파일을 업로드해주세요', 'error');
+                return;
+            }
+
+            try {
+                log('Storage 삭제 테스트 시작...');
+                
+                const storageRef = storage.ref(testFileName);
+                await storageRef.delete();
+                
+                log('테스트 파일 삭제 성공', 'success');
+                testFileName = '';
+                
+            } catch (error) {
+                log(`Storage 삭제 실패: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

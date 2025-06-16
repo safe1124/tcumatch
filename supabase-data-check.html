@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase 데이터 확인</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+        .btn { padding: 10px 20px; margin: 10px 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .log { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 20px 0; border-radius: 5px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .error { color: red; }
+        .success { color: green; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Supabase 데이터 확인 도구</h1>
+    
+    <div>
+        <button class="btn btn-primary" onclick="checkProfiles()">프로필 데이터 확인</button>
+        <button class="btn btn-success" onclick="addTestProfile()">테스트 프로필 추가</button>
+        <button class="btn" onclick="clearLog()">로그 지우기</button>
+    </div>
+
+    <div id="log" class="log"></div>
+    <div id="data-display"></div>
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // 로그 함수
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+            logElement.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('data-display').innerHTML = '';
+        }
+
+        // Supabase 설정
+        const SUPABASE_URL = 'https://wamndgvguaybvgoudpxm.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbW5kZ3ZndWF5YnZnb3VkcHhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2NDEwOTYsImV4cCI6MjA2NTIxNzA5Nn0.MmHWayjKCZbA_f9p4A5cToUnNbhslpavmfoanH5mlZU';
+        let supabaseClient = null;
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            log("페이지 로드 완료");
+
+            try {
+                if (typeof window.supabase !== 'undefined') {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    log("✅ Supabase 클라이언트 초기화 완료", 'success');
+                } else {
+                    log("❌ Supabase SDK 로드 실패", 'error');
+                }
+            } catch (error) {
+                log(`초기화 오류: ${error.message}`, 'error');
+            }
+        });
+
+        // 프로필 데이터 확인
+        async function checkProfiles() {
+            log("=== 프로필 데이터 확인 시작 ===");
+
+            if (!supabaseClient) {
+                log("❌ Supabase 클라이언트가 없습니다", 'error');
+                return;
+            }
+
+            try {
+                // 모든 프로필 데이터 가져오기
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    log(`❌ 데이터 조회 오류: ${error.message}`, 'error');
+                    
+                    if (error.code === '42P01') {
+                        log("💡 profiles 테이블이 존재하지 않습니다", 'error');
+                    }
+                    return;
+                }
+
+                log(`✅ 조회 성공: ${data ? data.length : 0}개의 프로필 발견`, 'success');
+
+                // 데이터를 테이블로 표시
+                displayData(data);
+
+            } catch (error) {
+                log(`❌ 예상치 못한 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 데이터를 테이블로 표시
+        function displayData(data) {
+            const displayDiv = document.getElementById('data-display');
+            
+            if (!data || data.length === 0) {
+                displayDiv.innerHTML = '<p>저장된 프로필이 없습니다.</p>';
+                return;
+            }
+
+            let html = '<h3>저장된 프로필 데이터</h3><table>';
+            html += '<tr><th>ID</th><th>User ID</th><th>Email</th><th>Nickname</th><th>Gender</th><th>Birthdate</th><th>Bio</th><th>Created At</th></tr>';
+
+            data.forEach(profile => {
+                html += `<tr>
+                    <td>${profile.id || '-'}</td>
+                    <td>${profile.user_id || '-'}</td>
+                    <td>${profile.email || '-'}</td>
+                    <td>${profile.nickname || '-'}</td>
+                    <td>${profile.gender || '-'}</td>
+                    <td>${profile.birthdate || '-'}</td>
+                    <td>${profile.bio ? profile.bio.substring(0, 50) + '...' : '-'}</td>
+                    <td>${profile.created_at ? new Date(profile.created_at).toLocaleString() : '-'}</td>
+                </tr>`;
+            });
+
+            html += '</table>';
+            displayDiv.innerHTML = html;
+        }
+
+        // 테스트 프로필 추가
+        async function addTestProfile() {
+            log("=== 테스트 프로필 추가 시작 ===");
+
+            if (!supabaseClient) {
+                log("❌ Supabase 클라이언트가 없습니다", 'error');
+                return;
+            }
+
+            try {
+                const testProfile = {
+                    user_id: 'test_user_' + Date.now(),
+                    email: 'test@example.com',
+                    nickname: '테스트유저' + Math.floor(Math.random() * 1000),
+                    gender: 'other',
+                    birthdate: '1995-01-01',
+                    bio: '테스트 프로필입니다.',
+                    profile_picture_url: '',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                log(`추가할 데이터: ${JSON.stringify(testProfile, null, 2)}`);
+
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .insert(testProfile)
+                    .select();
+
+                if (error) {
+                    log(`❌ 테스트 프로필 추가 실패: ${error.message}`, 'error');
+                } else {
+                    log(`✅ 테스트 프로필 추가 성공: ${JSON.stringify(data)}`, 'success');
+                    
+                    // 데이터 다시 조회
+                    await checkProfiles();
+                }
+
+            } catch (error) {
+                log(`❌ 예상치 못한 오류: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
